@@ -142,6 +142,14 @@ function runDriveScene(state, seconds, heat, waypoints) {
   let stuckTimer = 0;
   let reverseTimer = 0;
   let stuckCount = 0;
+  // Walking state: the player can get wedged on a building corner on the
+  // way to a car, so a stuck walk sidesteps, and after 10s the facing
+  // preference is dropped in favour of the nearest car, full stop.
+  let walkSteps = 0;
+  let walkCheckAt = 0;
+  let walkCheckPos = null;
+  let sidestepTimer = 0;
+  let sidestepDir = 1;
 
   function driveStep() {
     const player = state.player;
@@ -192,13 +200,33 @@ function runDriveScene(state, seconds, heat, waypoints) {
     const player = state.player;
     const wasInCar = player.inCar;
     if (!player.inCar) {
+      walkSteps += 1;
       const first = waypoints[0];
-      const { car, dist } = nearestParkedCar(state, first.x, first.y);
+      const prefer = walkSteps < 600;
+      const { car, dist } = nearestParkedCar(state, prefer ? first.x : undefined, prefer ? first.y : undefined);
       if (car && dist < 70) {
         actions.interact = true;
         pilot.stop();
       } else if (car) {
-        walkToward(state, pilot, car.x, car.y);
+        if (walkSteps - walkCheckAt >= 90) {
+          const moved = walkCheckPos ? Math.hypot(player.x - walkCheckPos.x, player.y - walkCheckPos.y) : 99;
+          walkCheckAt = walkSteps;
+          walkCheckPos = { x: player.x, y: player.y };
+          if (moved < 15) {
+            sidestepTimer = 60;
+            sidestepDir *= -1;
+          }
+        }
+        if (sidestepTimer > 0) {
+          sidestepTimer -= 1;
+          const dx = car.x - player.x;
+          const dy = car.y - player.y;
+          const len = Math.hypot(dx, dy) || 1;
+          pilot.setMove((-dy / len) * sidestepDir, (dx / len) * sidestepDir);
+          pilot.setRun(true);
+        } else {
+          walkToward(state, pilot, car.x, car.y);
+        }
       }
     } else {
       if (heat > 0 && !heated) {
@@ -209,7 +237,13 @@ function runDriveScene(state, seconds, heat, waypoints) {
     }
     stepWorld(state, STEP, pilot.input, actions);
     // A freshly stolen car starts a fresh route from where it sits.
-    if (!wasInCar && player.inCar) route = null;
+    if (!wasInCar && player.inCar) {
+      route = null;
+      walkSteps = 0;
+      walkCheckAt = 0;
+      walkCheckPos = null;
+      sidestepTimer = 0;
+    }
     if (heat === 0) {
       state.wanted = 0;
       state.bustProgress = 0;
@@ -268,9 +302,9 @@ function runMissionScene(state, seconds) {
   const pilot = makePilot();
   state.missionsDone = 2;
   state.missionDelay = 0.1;
-  state.player.x = 1500;
+  state.player.x = 1580;
   state.player.y = 1200;
-  state.camera.x = 1500;
+  state.camera.x = 1580;
   state.camera.y = 1200;
   const park = LANDMARKS.park;
   let strafeDir = 1;

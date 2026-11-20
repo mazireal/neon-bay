@@ -36,7 +36,10 @@ function makeCamera() {
 export function createWorld(seed, saveData) {
   const random = createRandom(seed);
   const city = createCity(random);
-  const player = createPlayer(LANDMARKS.diner.x, LANDMARKS.diner.y + 120);
+  // Kai starts on the grass at the park's edge by the diner — off the road,
+  // so the traffic rolling past on the title screen can't run him over
+  // before the player even presses start.
+  const player = createPlayer(LANDMARKS.diner.x + 80, LANDMARKS.diner.y + 120);
   if (saveData) {
     player.cash = saveData.cash;
   }
@@ -358,8 +361,10 @@ export function respawnAfterArrest(state, busted) {
   player.car = null;
   player.ammo = PLAYER.magSize;
   const spot = busted ? LANDMARKS.policeStation : LANDMARKS.hospital;
-  player.x = spot.x;
-  player.y = spot.y + 100;
+  // Step out beside the building, off the road, and out of any wall.
+  const placed = state.city.collideCircle(spot.x + 90, spot.y + 100, PLAYER.radius);
+  player.x = placed.x;
+  player.y = placed.y;
   state.camera.x = player.x;
   state.camera.y = player.y;
   clearWanted(state);
