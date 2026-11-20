@@ -275,7 +275,17 @@ export function stepWorld(state, dt, input, actions) {
       const throttle = input.moveY() < 0 ? 1 : 0;
       const brake = input.moveY() > 0 ? 1 : 0;
       const steer = input.moveX();
+      const handbrake = input.handbrake();
+      const prevVx = car.vx;
+      const prevVy = car.vy;
       const hitWall = driveCar(car, throttle, brake, steer, dt, state.city);
+      if (handbrake) {
+        // Lock the rear wheels: keep the old momentum, so the car slides,
+        // and scrub speed off.
+        car.vx = prevVx * 0.92 + car.vx * 0.08;
+        car.vy = prevVy * 0.92 + car.vy * 0.08;
+        car.speed *= Math.max(0, 1 - 1.8 * dt);
+      }
       if (hitWall && Math.abs(car.speed) > 150) {
         state.events.crash = true;
         state.shake = Math.max(state.shake, 7);
@@ -284,8 +294,8 @@ export function stepWorld(state, dt, input, actions) {
       player.x = car.x;
       player.y = car.y;
       player.angle = car.angle;
-      // Skid marks when turning hard at speed.
-      if (Math.abs(car.speed) > 300 && Math.abs(steer) > 0.6) {
+      // Skid marks when turning hard at speed, or sliding on the handbrake.
+      if ((Math.abs(car.speed) > 300 && Math.abs(steer) > 0.6) || (handbrake && Math.abs(car.speed) > 120)) {
         car.skidTimer -= dt;
         if (car.skidTimer <= 0) {
           car.skidTimer = 0.06;
