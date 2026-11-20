@@ -34,6 +34,9 @@ function spawnPoliceCar(state) {
   car.state = 'police';
   car.siren = true;
   car.cruise = 600;
+  // Each unit takes a slot around the player — front, back, left, right —
+  // so they surround instead of all piling onto the same spot.
+  car.pursuitSlot = state.cars.filter((c) => c.state === 'police').length % 4;
   state.cars.push(car);
   return car;
 }
@@ -84,13 +87,33 @@ export function stepPolice(state, dt) {
     }
   }
 
-  // Police cars chase the player and try to ram; near a slow player on foot
-  // an officer gets out to make the arrest.
+  // Police cars chase the player from their pursuit slots and try to ram;
+  // near a slow player on foot an officer gets out to make the arrest. A
+  // unit that gets wedged backs out and re-engages instead of pinning the
+  // player forever, so a chase stays a chase.
   for (const car of policeCars) {
     const d = Math.hypot(player.x - car.x, player.y - car.y);
-    const steer = steerToward(car, player.x, player.y);
-    const throttle = d > 40 ? 1 : 0;
-    driveCar(car, throttle, 0, steer, dt, state.city);
+    const slotAngle = player.angle + (car.pursuitSlot || 0) * (Math.PI / 2);
+    const tx = player.x + Math.cos(slotAngle) * 130;
+    const ty = player.y + Math.sin(slotAngle) * 130;
+    const steer = steerToward(car, tx, ty);
+    if (car.reverseTimer > 0) {
+      car.reverseTimer -= dt;
+      driveCar(car, 0, 1, -steer, dt, state.city);
+    } else {
+      const targetD = Math.hypot(tx - car.x, ty - car.y);
+      const throttle = targetD > 60 ? 1 : 0;
+      driveCar(car, throttle, 0, steer, dt, state.city);
+      if (Math.abs(car.speed) < 25 && d > 150) {
+        car.stuckTimer += dt;
+        if (car.stuckTimer > 1.2) {
+          car.reverseTimer = 0.8;
+          car.stuckTimer = 0;
+        }
+      } else {
+        car.stuckTimer = 0;
+      }
+    }
     if (!player.inCar && d < 120 && officers.length < 2 && Math.abs(car.speed) < 120) {
       spawnOfficer(state, car);
     }

@@ -10,7 +10,7 @@ export function fireBullet(state, x, y, angle, owner) {
     vy: Math.sin(angle) * 950,
     life: 0.9,
     owner, // 'player' | 'enemy'
-    damage: owner === 'player' ? PLAYER.bulletDamage : 12,
+    damage: owner === 'player' ? PLAYER.bulletDamage : 9,
   });
 }
 
@@ -201,7 +201,7 @@ export function stepEnemies(state, dt) {
       const spread = (Math.random() - 0.5) * 0.35;
       fireBullet(state, e.x, e.y, want + spread, 'enemy');
       state.events.enemyShot = true;
-      e.fireCooldown = 0.7 + Math.random() * 0.7;
+      e.fireCooldown = 0.9 + Math.random() * 0.8;
     }
   }
   // Clear the dead after a moment so the renderer can show the fall.

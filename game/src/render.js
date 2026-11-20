@@ -290,17 +290,17 @@ export function createRenderer(canvas) {
     g.restore();
   }
 
-  function drawMinimap(g, state, x, y, size) {
+  function drawMinimap(g, state, x, y, w, h) {
     const layer = prerenderCity(state);
     g.save();
     g.beginPath();
-    roundRect(g, x, y, size, size, 10);
+    roundRect(g, x, y, w, h, 10);
     g.clip();
     g.fillStyle = '#0c1420';
-    g.fillRect(x, y, size, size);
-    g.drawImage(layer, 0, 0, WORLD.width, WORLD.height, x, y, size, size * (WORLD.height / WORLD.width));
-    const sx = size / WORLD.width;
-    const sy = size / WORLD.width;
+    g.fillRect(x, y, w, h);
+    g.drawImage(layer, 0, 0, WORLD.width, WORLD.height, x, y, w, h);
+    const sx = w / WORLD.width;
+    const sy = h / WORLD.height;
     // Mission marker: a blinking yellow diamond.
     const marker = missionMarker(state);
     if (marker) {
@@ -350,7 +350,7 @@ export function createRenderer(canvas) {
     g.restore();
     g.strokeStyle = 'rgba(255,255,255,0.75)';
     g.lineWidth = 2;
-    roundRect(g, x, y, size, size, 10);
+    roundRect(g, x, y, w, h, 10);
     g.stroke();
     g.fillStyle = '#ffffff';
     g.font = '900 13px ' + FONT;
@@ -421,8 +421,8 @@ export function createRenderer(canvas) {
       g.fillText(player.reloading > 0 ? 'RELOADING...' : `AMMO ${player.ammo} / 12`, pad, pad + 152);
     }
 
-    // Top-right: minimap.
-    drawMinimap(g, state, view.width - 216, pad, 200);
+    // Top-right: minimap, sized to the world's aspect ratio.
+    drawMinimap(g, state, view.width - 216, pad, 200, 144);
 
     // Top-center: objective.
     const objective = objectiveText(state);
@@ -604,6 +604,18 @@ export function createRenderer(canvas) {
       }
       g.restore();
     }
+    // A ring under the player's car so it is always findable.
+    const player = state.player;
+    if (player.inCar && player.car) {
+      g.save();
+      g.globalAlpha = 0.65 + Math.sin(state.time * 4) * 0.25;
+      g.strokeStyle = '#ffffff';
+      g.lineWidth = 3;
+      g.beginPath();
+      g.ellipse(player.car.x, player.car.y, 50, 36, player.car.angle, 0, Math.PI * 2);
+      g.stroke();
+      g.restore();
+    }
     // Cars.
     for (const car of state.cars) drawCar(g, car, state.time);
     // Pedestrians and officers.
@@ -621,7 +633,6 @@ export function createRenderer(canvas) {
       }
     }
     // Player (on foot only; in a car the car is the player).
-    const player = state.player;
     if (!player.inCar && player.health > 0) {
       drawPerson(g, player.x, player.y, player.aimAngle, '#14b8a6', '#1f2937', player.moving ? state.time * 12 : 0, true, false, false);
       // Gun + aim line.
@@ -721,13 +732,10 @@ export function createRenderer(canvas) {
     g.font = '700 16px ' + FONT;
     g.fillStyle = '#ffe600';
     g.fillText('5 STORY MISSIONS  •  STEAL & DRIVE  •  TRAFFIC & PEDESTRIANS  •  WANTED SYSTEM & POLICE CHASES  •  COMBAT  •  MINIMAP  •  AUTOSAVE', view.width / 2, view.height * 0.3 + 146);
-    // Start prompt.
-    const blink = Math.floor(state.time * 2) % 2 === 0;
-    if (blink) {
-      g.fillStyle = '#ffffff';
-      g.font = '900 28px ' + FONT;
-      g.fillText(ui.saveExists ? 'PRESS ENTER OR CLICK — CONTINUE' : 'PRESS ENTER OR CLICK TO START', view.width / 2, view.height * 0.62);
-    }
+    // Start prompt: always on, so the title screenshot carries it.
+    g.fillStyle = '#ffffff';
+    g.font = '900 28px ' + FONT;
+    g.fillText(ui.saveExists ? 'PRESS ENTER OR CLICK — CONTINUE' : 'PRESS ENTER OR CLICK TO START', view.width / 2, view.height * 0.62);
     if (ui.saveExists) {
       g.fillStyle = 'rgba(255,255,255,0.8)';
       g.font = '400 16px ' + FONT;

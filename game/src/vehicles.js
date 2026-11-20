@@ -24,6 +24,7 @@ export function createCar(x, y, angle, type, color) {
     target: null,
     cruise: 200,
     stuckTimer: 0,
+    reverseTimer: 0,
     // Skid marks and smoke.
     skidTimer: 0,
     smokeTimer: 0,
@@ -158,18 +159,27 @@ export function stepTrafficCar(car, dt, city, random, cars) {
     const dy = other.y - car.y;
     const ahead = dx * fx + dy * fy;
     const side = Math.abs(dx * -fy + dy * fx);
-    if (ahead > 0 && ahead < 95 && side < 30) { blocked = true; break; }
+    if (ahead > 0 && ahead < 130 && side < 36) { blocked = true; break; }
+  }
+  // Backing out of a jam: reverse briefly, then take another route, so a
+  // pile-up at an intersection clears instead of sitting there forever.
+  if (car.reverseTimer > 0) {
+    car.reverseTimer -= dt;
+    const steer = steerToward(car, car.target.x, car.target.y);
+    driveCar(car, 0, 1, -steer, dt, city);
+    if (car.reverseTimer <= 0) car.target = nextIntersectionTarget(car, random);
+    return;
   }
   const steer = steerToward(car, car.target.x, car.target.y);
   const wantSpeed = blocked ? 0 : car.cruise;
   const throttle = car.speed < wantSpeed ? 1 : 0;
   const brake = car.speed > wantSpeed + 20 ? 1 : 0;
   driveCar(car, throttle, brake, steer, dt, city);
-  // A car that cannot move for a while gets a new target (it may be boxed in).
-  if (Math.abs(car.speed) < 12 && !blocked) {
+  // A car that cannot move for a while — jammed, not just waiting — backs out.
+  if (Math.abs(car.speed) < 12) {
     car.stuckTimer += dt;
-    if (car.stuckTimer > 3) {
-      car.target = nextIntersectionTarget(car, random);
+    if (car.stuckTimer > 2.5) {
+      car.reverseTimer = 0.9;
       car.stuckTimer = 0;
     }
   } else {
